@@ -9,7 +9,7 @@ app.use(cors());
 
 require("dotenv").config();
 
-require("./config/postgreSql-db");
+require("./config/mysql-db");
 
 const PORT = process.env.PORT;
 

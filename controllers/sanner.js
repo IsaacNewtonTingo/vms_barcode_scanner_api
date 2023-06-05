@@ -1,6 +1,6 @@
 const { Expo } = require("expo-server-sdk");
-const connection = require("../config/postgreSql-db");
-const pool = require("../config/postgreSql-db");
+const connection = require("../config/mysql-db");
+const pool = require("../config/mysql-db");
 const expo = new Expo();
 
 exports.initiateScanner = async (req, res) => {
