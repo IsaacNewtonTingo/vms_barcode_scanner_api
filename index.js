@@ -9,9 +9,13 @@ app.use(cors());
 
 require("dotenv").config();
 
-require("./config/mysql-db");
+require("./config/postgreSql-db");
 
 const PORT = process.env.PORT;
+
+app.get("/", (req, res) => {
+  res.send("Hello");
+});
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);

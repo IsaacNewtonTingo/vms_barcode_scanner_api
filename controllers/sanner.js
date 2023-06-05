@@ -1,5 +1,6 @@
 const { Expo } = require("expo-server-sdk");
-const connection = require("../config/mysql-db");
+const connection = require("../config/postgreSql-db");
+const pool = require("../config/postgreSql-db");
 const expo = new Expo();
 
 exports.initiateScanner = async (req, res) => {
@@ -158,5 +159,19 @@ exports.storeSerialNumber = async (req, res) => {
       message: "An error occured while trying to store serialNumber",
       error: error.message,
     });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  try {
+    pool.query("SELECT * FROM users ORDER BY id ASC", (error, results) => {
+      if (error) {
+        console.log(error);
+      } else {
+        res.send(results.rows);
+      }
+    });
+  } catch (error) {
+    console.log(error);
   }
 };
