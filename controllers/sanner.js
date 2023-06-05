@@ -5,11 +5,12 @@ const expo = new Expo();
 
 exports.initiateScanner = async (req, res) => {
   try {
-    const { deviceTokens, soldierID } = req.body;
+    const { deviceTokens, soldierFirstName, soldierLastName, soldierID } =
+      req.body;
 
     let notifications = [];
     const title = "Scanner initiated";
-    const body = "Watch magic";
+    const body = `${soldierFirstName} ${soldierLastName} has initiated a scan process in the VMS portal. Click to open Scanner`;
     //check if it's a valid expo token
 
     for (let token of deviceTokens) {
@@ -133,6 +134,8 @@ exports.storeSerialNumber = async (req, res) => {
   try {
     //store with soldier id and serial number
     const { soldierID, serialNumber } = req.body;
+
+    //delete existing record first
     //perform store
     const insertQuery = `INSERT INTO temp_serial_numbers (soldier_id, serial_number) VALUES (?, ?)`;
     // Execute the query to insert the values
