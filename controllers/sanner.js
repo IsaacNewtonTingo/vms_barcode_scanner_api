@@ -37,14 +37,6 @@ exports.initiateScanner = async (req, res) => {
         console.log(receipts);
 
         if (receipts[0].id) {
-          //wait for serial number from scanner
-          //keep checking for serial number availability in db
-          //if serial number exists,get records, delete the serial number
-          //we can set a timeout of 5 minutes then deletes the serial number
-          //after the timeout elapses, you will need to initiate another sequence
-          //scan one device at a time
-          //when storing the serial number, store the identifier of the user that needs that serial number
-          //user identifier can be passed through notification
           let checkComplete = false;
           let storedSerialNumber = null;
 
@@ -52,26 +44,62 @@ exports.initiateScanner = async (req, res) => {
             //keep checking
 
             const interval = setInterval(() => {
-              //run our check in here. Hit db endpoint
-              //check if record with soldierID exists
-              /*
-               * if record exists, hit endpoint to check user records
-               * clear interval and timeout
-               * set check complete to true and update storedSerialNumber
-               * return the record as response to vms portal
-               * Delete serial number record
-               *
-               */
-
               console.log("---------Checking---------");
               connection.query(
-                "SELECT * FROM temp_serial_number WHERE soldier_id = ?",
+                "SELECT serial_number FROM temp_serial_numbers WHERE soldier_id = ?",
                 [soldierID],
                 (err, results) => {
                   if (results?.length > 0) {
                     checkComplete = true;
-                    storedSerialNumber = results;
-                    res.send(results);
+                    storedSerialNumber = results[0].serial_number;
+
+                    clearInterval(interval);
+                    clearTimeout(timeout);
+
+                    //check user details
+                    connection.query(
+                      "SELECT * FROM devices INNER JOIN users ON devices.user_id = users.id WHERE devices.serial_number = ?",
+                      [storedSerialNumber],
+                      (err, results) => {
+                        if (err) {
+                          console.error("Error executing query: ", err);
+                          res.json({
+                            status: "Failed",
+                            message:
+                              "An error occurred while getting user data associated with the serial number",
+                            error: err,
+                          });
+                        } else {
+                          res.json({
+                            status: "Success",
+                            message: "User data retrieved successfully",
+                            data: results,
+                          });
+
+                          //delete the temp_serial record
+                          const query = `DELETE FROM temp_serial_numbers WHERE serial_number = ?`;
+                          connection.query(
+                            query,
+                            [storedSerialNumber],
+                            (err, results) => {
+                              if (err) {
+                                console.error("Error executing query: ", err);
+                                res.json({
+                                  status: "Failed",
+                                  message:
+                                    "An error occurred while deleting serial number",
+                                  error: err,
+                                });
+                              } else {
+                                console.log(
+                                  "Temporary serial number deleted successfully"
+                                );
+                              }
+                            }
+                          );
+                        }
+                      }
+                    );
                   } else if (err) {
                     console.error("Error executing query: ", err);
                     return;
@@ -101,56 +129,28 @@ exports.initiateScanner = async (req, res) => {
 };
 
 //create a function that stores the serial number temporarily
-
 exports.storeSerialNumber = async (req, res) => {
   try {
     //store with soldier id and serial number
     const { soldierID, serialNumber } = req.body;
     //perform store
-    // Define the SQL query to create the table
-    const createTableQuery = `CREATE TABLE IF NOT EXISTS temp_serial_number (
-        soldier_id INT,
-        serial_number VARCHAR(255)
-      );`;
-
-    connection.query(createTableQuery, (err, results) => {
+    const insertQuery = `INSERT INTO temp_serial_numbers (soldier_id, serial_number) VALUES (?, ?)`;
+    // Execute the query to insert the values
+    connection.query(insertQuery, [soldierID, serialNumber], (err, results) => {
       if (err) {
-        console.error("Error creating table: ", err);
+        console.error("Error inserting values: ", err);
         res.status(500).json({
           status: "Failed",
-          message: "An error occurred while creating the table",
+          message: "An error occurred while inserting values",
           error: err.message,
         });
         return;
       }
-      console.log("Table created successfully");
-
-      // Define the SQL query to insert the values
-      const insertQuery = `INSERT INTO temp_serial_number (soldier_id, serial_number) VALUES (?, ?)`;
-
-      // Execute the query to insert the values
-      connection.query(
-        insertQuery,
-        [soldierID, serialNumber],
-        (err, results) => {
-          if (err) {
-            console.error("Error inserting values: ", err);
-            res.status(500).json({
-              status: "Failed",
-              message: "An error occurred while inserting values",
-              error: err.message,
-            });
-            return;
-          }
-          console.log("Values inserted successfully");
-
-          // Send a success response
-          res.json({
-            status: "Success",
-            message: "Table created, and values inserted successfully",
-          });
-        }
-      );
+      // Send a success response
+      res.json({
+        status: "Success",
+        message: "Serial number stored successfully",
+      });
     });
   } catch (error) {
     console.log(error);
@@ -159,19 +159,5 @@ exports.storeSerialNumber = async (req, res) => {
       message: "An error occured while trying to store serialNumber",
       error: error.message,
     });
-  }
-};
-
-exports.getUsers = async (req, res) => {
-  try {
-    pool.query("SELECT * FROM users ORDER BY id ASC", (error, results) => {
-      if (error) {
-        console.log(error);
-      } else {
-        res.send(results.rows);
-      }
-    });
-  } catch (error) {
-    console.log(error);
   }
 };
