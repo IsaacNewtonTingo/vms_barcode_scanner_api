@@ -6,120 +6,122 @@ const expo = new Expo();
 
 exports.initiateScanner = async (req, res) => {
   try {
-    const { deviceTokens, soldierFirstName, soldierLastName, soldierID } =
+    console.log("----------Scan initiated---------");
+    const { deviceToken, soldierFirstName, soldierLastName, soldierID } =
       req.body;
 
-    let notifications = [];
-    const title = "Scanner initiated";
-    const body = `${soldierFirstName} ${soldierLastName} has initiated a scan process in the VMS portal. Click to open Scanner`;
-    //check if it's a valid expo token
+    //delete all existing soldier id records
+    const deleteQuery = `DELETE FROM temp_serial_numbers WHERE soldier_id = ?`;
 
-    for (let token of deviceTokens) {
-      if (!Expo.isExpoPushToken(token)) {
-        console.log(`Push token ${token} is not a valid Expo push token`);
-      } else {
-        // Construct the notification to send
-        notifications.push({
-          to: token,
-          sound: "default",
-          title: title,
-          body: body,
-          data: {
-            soldierID,
-          },
+    connection.query(deleteQuery, [soldierID], async (err, results) => {
+      if (err) {
+        console.error("Error deleteing records: ", err);
+        res.status(500).json({
+          status: "Failed",
+          message: "An error occurred while deleting existing records",
+          error: err.message,
         });
+      } else {
+        const message = {
+          token: deviceToken,
+          notification: {
+            title: "Scanner initiated",
+            body: `${soldierFirstName} ${soldierLastName} has initiated a scan process in the VMS portal. Click to open Scanner`,
+          },
+        };
+        await firebaseAdmin
+          .messaging()
+          .send(message)
+          .then((response) => {
+            let checkComplete = false;
+            let storedSerialNumber = null;
+
+            if (!checkComplete && !storedSerialNumber) {
+              //keep checking
+
+              const interval = setInterval(() => {
+                console.log("---------Checking---------");
+                connection.query(
+                  "SELECT serial_number FROM temp_serial_numbers WHERE soldier_id = ?",
+                  [soldierID],
+                  (err, results) => {
+                    if (results?.length > 0) {
+                      checkComplete = true;
+                      storedSerialNumber = results[0].serial_number;
+
+                      clearInterval(interval);
+                      clearTimeout(timeout);
+
+                      //check user details
+                      connection.query(
+                        "SELECT * FROM devices INNER JOIN users ON devices.user_id = users.id WHERE devices.serial_number = ?",
+                        [storedSerialNumber],
+                        (err, results) => {
+                          if (err) {
+                            console.error("Error executing query: ", err);
+                            res.json({
+                              status: "Failed",
+                              message:
+                                "An error occurred while getting user data associated with the serial number",
+                              error: err,
+                            });
+                          } else {
+                            res.json({
+                              status: "Success",
+                              message: "User data retrieved successfully",
+                              data: results,
+                            });
+
+                            //delete the temp_serial record
+                            const query = `DELETE FROM temp_serial_numbers WHERE soldier_id = ?`;
+                            connection.query(
+                              query,
+                              [soldierID],
+                              (err, results) => {
+                                if (err) {
+                                  console.error("Error executing query: ", err);
+                                  res.json({
+                                    status: "Failed",
+                                    message:
+                                      "An error occurred while deleting serial number",
+                                    error: err,
+                                  });
+                                } else {
+                                  console.log(
+                                    "------------Scan completed------------"
+                                  );
+                                }
+                              }
+                            );
+                          }
+                        }
+                      );
+                    } else if (err) {
+                      console.error("Error executing query: ", err);
+                      return;
+                    }
+                  }
+                );
+              }, 1000);
+
+              const timeout = setTimeout(() => {
+                console.log("-----Timeout reached------");
+                res.json({
+                  status: "Failed",
+                  message: "You have not scanned any device",
+                });
+                clearInterval(interval);
+                clearTimeout(timeout);
+
+                checkComplete = true;
+              }, 300000);
+            }
+          })
+          .catch((error) => {
+            console.log("Error sending notification:", error);
+          });
       }
-    }
-
-    let chunks = expo.chunkPushNotifications(notifications);
-
-    for (let chunk of chunks) {
-      try {
-        let receipts = await expo.sendPushNotificationsAsync(chunk);
-        res.send(receipts);
-
-        // if (receipts[0].id) {
-        //   let checkComplete = false;
-        //   let storedSerialNumber = null;
-
-        //   if (!checkComplete && !storedSerialNumber) {
-        //     //keep checking
-
-        //     const interval = setInterval(() => {
-        //       console.log("---------Checking---------");
-        //       connection.query(
-        //         "SELECT serial_number FROM temp_serial_numbers WHERE soldier_id = ?",
-        //         [soldierID],
-        //         (err, results) => {
-        //           if (results?.length > 0) {
-        //             checkComplete = true;
-        //             storedSerialNumber = results[0].serial_number;
-
-        //             clearInterval(interval);
-        //             clearTimeout(timeout);
-
-        //             //check user details
-        //             connection.query(
-        //               "SELECT * FROM devices INNER JOIN users ON devices.user_id = users.id WHERE devices.serial_number = ?",
-        //               [storedSerialNumber],
-        //               (err, results) => {
-        //                 if (err) {
-        //                   console.error("Error executing query: ", err);
-        //                   res.json({
-        //                     status: "Failed",
-        //                     message:
-        //                       "An error occurred while getting user data associated with the serial number",
-        //                     error: err,
-        //                   });
-        //                 } else {
-        //                   res.json({
-        //                     status: "Success",
-        //                     message: "User data retrieved successfully",
-        //                     data: results,
-        //                   });
-
-        //                   //delete the temp_serial record
-        //                   const query = `DELETE FROM temp_serial_numbers WHERE serial_number = ?`;
-        //                   connection.query(
-        //                     query,
-        //                     [storedSerialNumber],
-        //                     (err, results) => {
-        //                       if (err) {
-        //                         console.error("Error executing query: ", err);
-        //                         res.json({
-        //                           status: "Failed",
-        //                           message:
-        //                             "An error occurred while deleting serial number",
-        //                           error: err,
-        //                         });
-        //                       } else {
-        //                         console.log(
-        //                           "Temporary serial number deleted successfully"
-        //                         );
-        //                       }
-        //                     }
-        //                   );
-        //                 }
-        //               }
-        //             );
-        //           } else if (err) {
-        //             console.error("Error executing query: ", err);
-        //             return;
-        //           }
-        //         }
-        //       );
-        //     }, 1000);
-
-        //     const timeout = setTimeout(() => {
-        //       clearInterval(interval);
-        //       clearTimeout(timeout);
-        //     }, 300000);
-        //   }
-        // }
-      } catch (error) {
-        console.error(error);
-      }
-    }
+    });
   } catch (error) {
     console.log(error);
     res.json({
@@ -137,64 +139,45 @@ exports.storeSerialNumber = async (req, res) => {
     const { soldierID, serialNumber } = req.body;
 
     //delete existing record first
-    const deleteQuery = ``;
-    //perform store
-    const insertQuery = `INSERT INTO temp_serial_numbers (soldier_id, serial_number) VALUES (?, ?)`;
-    // Execute the query to insert the values
-    connection.query(insertQuery, [soldierID, serialNumber], (err, results) => {
+    const deleteQuery = `DELETE FROM temp_serial_numbers WHERE soldier_id = ?`;
+    connection.query(deleteQuery, [soldierID], (err, results) => {
       if (err) {
-        console.error("Error inserting values: ", err);
+        console.error("Error deleteing records: ", err);
         res.status(500).json({
           status: "Failed",
-          message: "An error occurred while inserting values",
+          message: "An error occurred while deleting existing records",
           error: err.message,
         });
-        return;
+      } else {
+        //perform store
+        const insertQuery = `INSERT INTO temp_serial_numbers (soldier_id, serial_number) VALUES (?, ?)`;
+        connection.query(
+          insertQuery,
+          [soldierID, serialNumber],
+          (err, results) => {
+            if (err) {
+              console.error("Error storing temporary records: ", err);
+              res.status(500).json({
+                status: "Failed",
+                message: "An error occurred while deleting existing records",
+                error: err.message,
+              });
+            } else {
+              // Send a success response
+              res.status(200).json({
+                status: "Success",
+                message: "Serial number stored successfully",
+              });
+            }
+          }
+        );
       }
-      // Send a success response
-      res.json({
-        status: "Success",
-        message: "Serial number stored successfully",
-      });
     });
   } catch (error) {
     console.log(error);
     res.json({
       status: "Failed",
       message: "An error occured while trying to store serialNumber",
-      error: error.message,
-    });
-  }
-};
-
-exports.sendNotif = async (req, res) => {
-  try {
-    const message = {
-      token:
-        "cIN_vcwpQc6RAzmFZ83nRk:APA91bENsOrB8SgSK7nCgE1dBmBuqoJxs9BszZdf9R_hoKov1oVQJwzKuomYBiwpGCuSIAIUQDAfAPnDysZvfvSma1NQJzAqLkaQEgL7ClPGv1CbDxUECkVqqb72x6muCfNdwqHU_ed-",
-      notification: {
-        title: "Scanner initiated",
-        body: "Soldier 1 has initiated a scan process.",
-      },
-    };
-
-    firebaseAdmin
-      .messaging()
-      .send(message)
-      .then((response) => {
-        res.json({
-          data: "Successfully sent notification:",
-          response,
-        });
-      })
-      .catch((error) => {
-        console.log("Error sending notification:", error);
-      });
-  } catch (error) {
-    console.log(error);
-    res.json({
-      status: "Failed",
-      message: "An error occured while trying to send notification",
       error: error.message,
     });
   }
