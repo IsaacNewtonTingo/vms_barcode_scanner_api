@@ -29,7 +29,10 @@ exports.login = async (req, res) => {
 
           sendSMS(phoneNumber, rawOtp)
             .then((response) => {
-              console.log("ola");
+              res.json({
+                status: "Success",
+                message: "Otp has been sent to your phone number",
+              });
             })
             .catch((error) => {
               res.json({
@@ -53,7 +56,7 @@ exports.login = async (req, res) => {
 
 exports.verifyOtp = async (req, res) => {
   try {
-    const { otp, phoneNumber } = req.body;
+    const { otp, phoneNumber, deviceToken } = req.body;
     const checkerQuery = `SELECT * FROM temp_otp WHERE phoneNumber = ${phoneNumber} ORDER BY DESC LIMIT 1`;
 
     connection.query(checkerQuery, async (error, results) => {
@@ -87,9 +90,21 @@ exports.verifyOtp = async (req, res) => {
               deleteOtpRecord(phoneNumber);
 
               //200 res
-              res.json({
-                status: "Success",
-                message: "Otp verified successfully",
+              //store token/update user record
+              const updateQuery = `UPDATE loginUsers SET deviceToken = ${deviceToken} WHERE phoneNumber = ${phoneNumber}`;
+              connection.query(updateQuery, (error, results) => {
+                if (error) {
+                  res.json({
+                    status: "Failed",
+                    message: "An error occured while trying to verify otp",
+                    error: error.message,
+                  });
+                } else {
+                  res.json({
+                    status: "Success",
+                    message: "Otp verified successfully",
+                  });
+                }
               });
             } else {
               res.json({

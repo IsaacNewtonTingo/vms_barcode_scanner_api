@@ -68,11 +68,24 @@ exports.initiateScanner = async (req, res) => {
                                 error: err,
                               });
                             } else {
-                              res.json({
-                                status: "Success",
-                                message: "User data retrieved successfully",
-                                data: results,
-                              });
+                              if (results.length > 0) {
+                                res.json({
+                                  status: "Success",
+                                  resultCode: 1,
+                                  description:
+                                    "User data retrieved successfully",
+                                  data: results[0],
+                                });
+                              } else {
+                                //no user found
+                                res.json({
+                                  status: "Success",
+                                  resultCode: 0,
+                                  description:
+                                    "No user record found for the scanned device",
+                                  data: null,
+                                });
+                              }
 
                               // Delete the temp_serial record
                               const query = `DELETE FROM temp_serial_numbers WHERE soldier_id = ?`;
