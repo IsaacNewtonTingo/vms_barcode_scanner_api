@@ -74,7 +74,7 @@ async function sendOtp(phoneNumber, rawOtp) {
             },
           ],
           from: process.env.INFOBIP_SENDER,
-          text: rawOtp,
+          text: `Here is your VMS OTP: ${rawOtp}`,
         },
       ],
     };

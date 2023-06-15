@@ -101,10 +101,27 @@ exports.verifyOtp = async (req, res) => {
                     error: error.message,
                   });
                 } else {
-                  res.json({
-                    status: "Success",
-                    message: "Otp verified successfully",
-                  });
+                  const userQuery = `SELECT * FROM loginUsers WHERE phoneNumber = ?`;
+                  connection.query(
+                    userQuery,
+                    [phoneNumber],
+                    (error, results) => {
+                      if (error) {
+                        console.log(error);
+                        res.json({
+                          status: "Failed",
+                          message: "An error occured while getting user data",
+                          error: error.message,
+                        });
+                      } else {
+                        res.json({
+                          status: "Success",
+                          message: "Otp verified successfully",
+                          data: results[0],
+                        });
+                      }
+                    }
+                  );
                 }
               });
             } else {
