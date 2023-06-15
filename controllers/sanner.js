@@ -56,7 +56,7 @@ exports.initiateScanner = async (req, res) => {
 
                         //check user details
                         connection.query(
-                          "SELECT * FROM asset_management INNER JOIN staff ON asset_management.staff_id = staff.id INNER JOIN users ON staff.user_id = users.id WHERE REPLACE(asset_management.serial_number, ' ', '') LIKE ?",
+                          "SELECT * FROM asset_management INNER JOIN staff ON asset_management.staff_id = staff.id INNER JOIN users ON staff.user_id = users.id WHERE REPLACE(asset_management.serial_number, ' ', '') LIKE ? ORDER BY asset_management.created_at DESC LIMIT 1",
                           [storedSerialNumber.replace(/\s/g, "")],
                           (err, results) => {
                             if (err) {

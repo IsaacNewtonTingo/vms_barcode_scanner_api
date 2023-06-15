@@ -22,5 +22,7 @@ app.listen(PORT, () => {
 });
 
 const scannerRouter = require("./routes/scanner");
+const loginRouter = require("./routes/login");
 
 app.use("/api/scanner/", scannerRouter);
+app.use("/api/user/", loginRouter);
