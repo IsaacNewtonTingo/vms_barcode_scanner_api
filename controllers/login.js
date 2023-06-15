@@ -35,10 +35,11 @@ exports.login = async (req, res) => {
               });
             })
             .catch((error) => {
+              console.log(error);
               res.json({
                 status: "Failed",
                 message: "Failed to send SMS",
-                error: error,
+                error: error.message,
               });
             });
         }
@@ -57,7 +58,7 @@ exports.login = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { otp, phoneNumber, deviceToken } = req.body;
-    const checkerQuery = `SELECT * FROM temp_otp WHERE phoneNumber = ${phoneNumber} ORDER BY DESC LIMIT 1`;
+    const checkerQuery = `SELECT * FROM temp_otp WHERE phoneNumber = ${phoneNumber}`;
 
     connection.query(checkerQuery, async (error, results) => {
       if (error) {
@@ -69,14 +70,13 @@ exports.verifyOtp = async (req, res) => {
       } else {
         if (results.length > 0) {
           const existingRecord = results[0];
-          const currentDate = new Date();
           const expiryDate = existingRecord.expiryDate;
 
-          if (expiryDate < currentDate) {
+          if (new Date(expiryDate) < new Date()) {
             //delete record
-            deleteOtpRecord(phoneNumber);
 
             //expired res
+            console.log("Has expired");
             res.json({
               status: "Failed",
               message: "Invalid otp entered",
@@ -91,9 +91,10 @@ exports.verifyOtp = async (req, res) => {
 
               //200 res
               //store token/update user record
-              const updateQuery = `UPDATE loginUsers SET deviceToken = ${deviceToken} WHERE phoneNumber = ${phoneNumber}`;
+              const updateQuery = `UPDATE loginUsers SET deviceToken = '${deviceToken}' WHERE phoneNumber = '${phoneNumber}'`;
               connection.query(updateQuery, (error, results) => {
                 if (error) {
+                  console.log(error);
                   res.json({
                     status: "Failed",
                     message: "An error occured while trying to verify otp",
@@ -107,6 +108,8 @@ exports.verifyOtp = async (req, res) => {
                 }
               });
             } else {
+              console.log("Wrong otp");
+
               res.json({
                 status: "Failed",
                 message: "Invalid otp entered",
@@ -138,8 +141,6 @@ function deleteOtpRecord(phoneNumber) {
     connection.query(deleteQuery, (error, results) => {
       if (error) {
         console.log(error.message);
-      } else {
-        console.log(results);
       }
     });
   } catch (error) {

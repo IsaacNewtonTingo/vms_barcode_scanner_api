@@ -45,11 +45,10 @@ async function sendSMS(phoneNumber, rawOtp) {
 async function storeOtp(phoneNumber, rawOtp, hashedOtp) {
   try {
     const storeQuery = `INSERT INTO temp_otp (phoneNumber, otp) VALUES (?, ?)`;
-
-    // Wrap the entire function in a Promise
     return new Promise((resolve, reject) => {
       connection.query(storeQuery, [phoneNumber, hashedOtp], (error, res) => {
         if (error) {
+          console.log(error);
           reject(error.message); // Reject the promise with the error
         } else {
           sendOtp(phoneNumber, rawOtp)
