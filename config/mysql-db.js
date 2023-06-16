@@ -16,6 +16,9 @@ const connection = mysql.createConnection({
       : process.env.DB_PASSWORD_PROD,
   database: process.env.ENV == "DEV" ? process.env.DB_DEV : process.env.DB_PROD,
 });
+
+console.log(process.env.DB_PROD);
+
 connection.connect((err) => {
   if (err) {
     console.error("Error connecting to the database: ", err);
