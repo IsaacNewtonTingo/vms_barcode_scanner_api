@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/niuzuwot/repositories/vms_barcode_scanner_api
+    - /bin/cp -R * $DEPLOYPATH
