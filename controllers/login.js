@@ -91,37 +91,34 @@ exports.verifyOtp = async (req, res) => {
 
               //200 res
               //store token/update user record
-              const updateQuery = `UPDATE loginUsers SET deviceToken = '${deviceToken}' WHERE phoneNumber = '${phoneNumber}'`;
-              connection.query(updateQuery, (error, results) => {
+              if (deviceToken) {
+                const updateQuery = `UPDATE loginUsers SET deviceToken = '${deviceToken}' WHERE phoneNumber = '${phoneNumber}'`;
+                connection.query(updateQuery, (error, results) => {
+                  if (error) {
+                    console.log(error);
+                    res.json({
+                      status: "Failed",
+                      message: "An error occured while trying to verify otp",
+                      error: error.message,
+                    });
+                  }
+                });
+              }
+              const userQuery = `SELECT * FROM loginUsers WHERE phoneNumber = ?`;
+              connection.query(userQuery, [phoneNumber], (error, results) => {
                 if (error) {
                   console.log(error);
                   res.json({
                     status: "Failed",
-                    message: "An error occured while trying to verify otp",
+                    message: "An error occured while getting user data",
                     error: error.message,
                   });
                 } else {
-                  const userQuery = `SELECT * FROM loginUsers WHERE phoneNumber = ?`;
-                  connection.query(
-                    userQuery,
-                    [phoneNumber],
-                    (error, results) => {
-                      if (error) {
-                        console.log(error);
-                        res.json({
-                          status: "Failed",
-                          message: "An error occured while getting user data",
-                          error: error.message,
-                        });
-                      } else {
-                        res.json({
-                          status: "Success",
-                          message: "Otp verified successfully",
-                          data: results[0],
-                        });
-                      }
-                    }
-                  );
+                  res.json({
+                    status: "Success",
+                    message: "Otp verified successfully",
+                    data: results[0],
+                  });
                 }
               });
             } else {
@@ -168,29 +165,51 @@ function deleteOtpRecord(phoneNumber) {
 exports.createSoldier = async (req, res) => {
   try {
     const { phoneNumber, firstName, lastName, deviceToken } = req.body;
-    const storeQuery = `INSERT
-      INTO loginUsers (phoneNumber, firstName, lastName, deviceToken)
-      VALUES (?, ?, ?, ?)`;
 
-    connection.query(
-      storeQuery,
-      [phoneNumber, firstName, lastName, deviceToken],
-      async (error, results) => {
-        if (error) {
-          console.log(error);
+    //check if soldier with the given phone already exists
+    const checkQuery = `SELECT * FROM loginUsers WHERE phoneNumber = ?`;
+
+    connection.query(checkQuery, [phoneNumber], (error, results) => {
+      if (error) {
+        console.log(error);
+        res.json({
+          status: "Failed",
+          message: "An error occured while checking existing records",
+          error: error.message,
+        });
+      } else {
+        if (results.length > 0) {
           res.json({
             status: "Failed",
-            message: "An error occured while trying to login",
-            error: error.message,
+            message: "Soldier with the given phone number already exists",
           });
         } else {
-          res.json({
-            status: "Success",
-            message: "Soldier created successfully",
-          });
+          const storeQuery = `INSERT
+            INTO loginUsers (phoneNumber, firstName, lastName, deviceToken)
+            VALUES (?, ?, ?, ?)`;
+
+          connection.query(
+            storeQuery,
+            [phoneNumber, firstName, lastName, deviceToken],
+            async (error, results) => {
+              if (error) {
+                console.log(error);
+                res.json({
+                  status: "Failed",
+                  message: "An error occured while trying to login",
+                  error: error.message,
+                });
+              } else {
+                res.json({
+                  status: "Success",
+                  message: "Soldier created successfully",
+                });
+              }
+            }
+          );
         }
       }
-    );
+    });
   } catch (error) {
     console.log(error);
     res.json({
